@@ -1,4 +1,5 @@
 ﻿using Client.App;
+using Shared.Enums;
 using Shared.Models;
 using Shared.Networking;
 using System;
@@ -14,7 +15,10 @@ namespace Client.Game
                 case ServerPacketId.SAlertMsg:
                     {
                         string alert = reader.ReadString();
-                        Console.WriteLine($"[Client] Alert: {alert}");
+                        ClientUI.OnUI(() =>
+                        {
+                            MessageBox.Show(alert, "Server Message", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        });
                         break;
                     }
                 case ServerPacketId.SSync:
@@ -52,12 +56,18 @@ namespace Client.Game
                         {
                             var id = reader.ReadString();
                             var name = reader.ReadString();
-                            var cls = reader.ReadString();
                             var lvl = reader.ReadInt();
-                            chars.Add(new CharacterSummary { Id = id, Name = name, Class = cls, Level = lvl });
+                            var classId = reader.ReadInt();
+
+                            chars.Add(new CharacterSummary
+                            {
+                                Id = id,
+                                Name = name,
+                                Level = lvl,
+                                ClassId = classId
+                            });
                         }
 
-                        // Now that we have real data, switch to the Characters panel
                         ClientUI.OnUI(() => ClientUI.MainMenu!.ShowCharacters(chars));
                         break;
                     }

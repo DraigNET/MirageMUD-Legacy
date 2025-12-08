@@ -8,7 +8,6 @@
         public required string PasswordHash { get; init; }      // PBKDF2 format: pbkdf2|v=1|iter|salt|hash
         public bool EmailVerified { get; set; }
         public DateTime CreatedUtc { get; init; } = DateTime.UtcNow;
-
-        // You can add account flags, last login, etc.
+        public List<Character> Characters { get; set; } = new();
     }
 }

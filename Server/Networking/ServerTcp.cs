@@ -1,4 +1,5 @@
-﻿using Shared.Models;
+﻿using Shared.Enums;
+using Shared.Models;
 using Shared.Networking;
 using System;
 using System.Collections.Generic;
@@ -26,8 +27,8 @@ namespace Server.Networking
             {
                 writer.Write(c.Id);
                 writer.Write(c.Name);
-                writer.Write(c.Class);
                 writer.Write(c.Level);
+                writer.Write(c.ClassId); // only send ID
             }
             SendBytes(clientId, writer.ToArray());
         }

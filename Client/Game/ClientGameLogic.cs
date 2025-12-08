@@ -1,7 +1,8 @@
-﻿using System.Text.Json;
-using System.Threading.Tasks;
+﻿using Client.Services;
+using Shared.Enums;
 using Shared.Networking;
-using Client.Services;
+using System.Text.Json;
+using System.Threading.Tasks;
 
 namespace Client.Game
 {
@@ -42,6 +43,16 @@ namespace Client.Game
                 writer.Write(username);
                 writer.Write(email);
                 writer.Write(password);
+            });
+        }
+        public static async Task SendNewCharacter(NetworkClient client, string name, CharacterClass @class, Gender gender, int avatar)
+        {
+            await client.SendAsync((int)ClientPacketId.CAddChar, writer =>
+            {
+                writer.Write(name);
+                writer.Write((int)@class);
+                writer.Write((int)gender);
+                writer.Write(avatar);
             });
         }
     }

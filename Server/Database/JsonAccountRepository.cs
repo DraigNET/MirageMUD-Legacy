@@ -1,133 +1,152 @@
-﻿using System.Text.Json;
+﻿using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Text.Json;
 using Shared.Models;
+using Shared.Security;
 
 namespace Server.Database
 {
     public sealed class JsonAccountRepository : IAccountRepository
     {
-        private readonly string _accountsPath;
-        private readonly string _charactersPath;
-        private readonly object _sync = new();
+        private readonly string _accountsDir;
+        private readonly JsonSerializerOptions _options = new() { WriteIndented = true };
 
-        private sealed record AccountRow(string Id, string Email, string Username, string PasswordHash, bool EmailVerified, DateTime CreatedUtc);
-        private sealed record CharacterRow(string Id, string AccountId, string Name, string Class, int Level);
-
-        public JsonAccountRepository(string dataDir)
+        public JsonAccountRepository(string baseDir)
         {
-            Directory.CreateDirectory(dataDir);
-            _accountsPath = Path.Combine(dataDir, "accounts.json");
-            _charactersPath = Path.Combine(dataDir, "characters.json");
-            if (!File.Exists(_accountsPath)) File.WriteAllText(_accountsPath, "[]");
-            if (!File.Exists(_charactersPath)) File.WriteAllText(_charactersPath, "[]");
+            _accountsDir = Path.Combine(baseDir, "Accounts");
+            Directory.CreateDirectory(_accountsDir);
         }
 
-        public Account? GetByUsernameOrEmail(string usernameOrEmail)
+        private string GetFilePath(string username)
         {
-            var list = LoadAccounts();
-            var found = list.FirstOrDefault(a =>
-                a.Username.Equals(usernameOrEmail, StringComparison.OrdinalIgnoreCase) ||
-                a.Email.Equals(usernameOrEmail, StringComparison.OrdinalIgnoreCase));
+            foreach (var c in Path.GetInvalidFileNameChars())
+                username = username.Replace(c, '_');
+            return Path.Combine(_accountsDir, $"{username}.json");
+        }
 
-            return found is null ? null : new Account
+        public Account? GetByUsername(string username)
+        {
+            var path = GetFilePath(username);
+            if (!File.Exists(path)) return null;
+            var json = File.ReadAllText(path);
+            return JsonSerializer.Deserialize<Account>(json, _options);
+        }
+
+        public Account? GetByEmail(string email)
+        {
+            var file = Directory.EnumerateFiles(_accountsDir, "*.json")
+                .FirstOrDefault(f =>
+                {
+                    var acc = JsonSerializer.Deserialize<Account>(File.ReadAllText(f), _options);
+                    return acc?.Email.Equals(email, StringComparison.OrdinalIgnoreCase) ?? false;
+                });
+
+            if (file == null) return null;
+            return JsonSerializer.Deserialize<Account>(File.ReadAllText(file), _options);
+        }
+
+        public bool Exists(string username)
+        {
+            return File.Exists(GetFilePath(username));
+        }
+
+        public Account Create(string username, string email, string password, out string? error)
+        {
+            error = null;
+
+            if (Exists(username))
             {
-                Id = found.Id,
-                Email = found.Email,
-                Username = found.Username,
-                PasswordHash = found.PasswordHash,
-                EmailVerified = found.EmailVerified,
-                CreatedUtc = found.CreatedUtc
+                error = "Username already exists.";
+                return null!;
+            }
+
+            if (GetByEmail(email) != null)
+            {
+                error = "Email already in use.";
+                return null!;
+            }
+
+            var account = new Account
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                Username = username,
+                Email = email,
+                PasswordHash = PasswordHasher.Hash(password),
+                EmailVerified = true,
+                CreatedUtc = DateTime.UtcNow,
+                Characters = new List<Character>()
             };
+
+            Save(account);
+            return account;
         }
 
-        public List<CharacterSummary> GetCharactersForAccount(string accountId)
+        public void Save(Account account)
         {
-            var chars = LoadCharacters().Where(c => c.AccountId == accountId);
-            return chars.Select(c => new CharacterSummary
-            {
-                Id = c.Id,
-                Name = c.Name,
-                Class = c.Class,
-                Level = c.Level
-            }).ToList();
+            var path = GetFilePath(account.Username);
+            var json = JsonSerializer.Serialize(account, _options);
+            File.WriteAllText(path, json);
         }
 
+        public List<CharacterSummary> GetCharacters(string username)
+        {
+            var acc = GetByUsername(username);
+            if (acc == null) return new List<CharacterSummary>();
+
+            return acc.Characters
+                .Select(CharacterSummary.FromCharacter)
+                .ToList();
+        }
+
+        public bool AddCharacter(string username, Character character, out string? error)
+        {
+            error = null;
+            var acc = GetByUsername(username);
+            if (acc == null)
+            {
+                error = "Account not found.";
+                return false;
+            }
+
+            if (acc.Characters.Count >= 5)
+            {
+                error = "Maximum 5 characters per account.";
+                return false;
+            }
+
+            acc.Characters.Add(character);
+            Save(acc);
+            return true;
+        }
+
+        public bool DeleteCharacter(string username, string charId)
+        {
+            var acc = GetByUsername(username);
+            if (acc == null) return false;
+
+            var existing = acc.Characters.FirstOrDefault(c => c.Id == charId);
+            if (existing == null) return false;
+
+            acc.Characters.Remove(existing);
+            Save(acc);
+            return true;
+        }
+        public bool CharacterBelongsTo(string username, string charId)
+        {
+            var acc = GetByUsername(username);
+            if (acc == null) return false;
+
+            return acc.Characters.Any(c => c.Id == charId);
+        }
         public bool IsAccountNameAvailable(string username)
+            => !Exists(username);
+
+        public Account? CreateAccount(string username, string email, string password)
         {
-            var list = LoadAccounts();
-            return !list.Any(a =>
-                a.Username.Equals(username, StringComparison.OrdinalIgnoreCase));
-        }
-
-        public Account? CreateAccount(string username, string email, string passwordHash)
-        {
-            var list = LoadAccounts();
-
-            // create row
-            var row = new AccountRow(
-                Guid.NewGuid().ToString(),
-                email,
-                username,
-                passwordHash,
-                true,
-                DateTime.UtcNow);
-
-            list.Add(row);
-            SaveAccounts(list);
-
-            return new Account
-            {
-                Id = row.Id,
-                Email = row.Email,
-                Username = row.Username,
-                PasswordHash = row.PasswordHash,
-                EmailVerified = row.EmailVerified,
-                CreatedUtc = row.CreatedUtc
-            };
-        }
-
-        private List<AccountRow> LoadAccounts()
-        {
-            lock (_sync)
-            {
-                var json = File.ReadAllText(_accountsPath);
-                return JsonSerializer.Deserialize<List<AccountRow>>(json) ?? new();
-            }
-        }
-
-        private void SaveAccounts(List<AccountRow> rows)
-        {
-            lock (_sync)
-            {
-                var json = JsonSerializer.Serialize(rows, new JsonSerializerOptions { WriteIndented = true });
-                File.WriteAllText(_accountsPath, json);
-            }
-        }
-
-        private List<CharacterRow> LoadCharacters()
-        {
-            lock (_sync)
-            {
-                var json = File.ReadAllText(_charactersPath);
-                return JsonSerializer.Deserialize<List<CharacterRow>>(json) ?? new();
-            }
-        }
-        public bool CharacterBelongsToAccount(string accountId, string characterId)
-        {
-            return LoadCharacters().Any(c => c.AccountId == accountId && c.Id == characterId);
-        }
-
-        public bool DeleteCharacter(string accountId, string characterId)
-        {
-            lock (_sync)
-            {
-                var list = LoadCharacters();
-                var idx = list.FindIndex(c => c.Id == characterId && c.AccountId == accountId);
-                if (idx < 0) return false;
-                list.RemoveAt(idx);
-                var json = JsonSerializer.Serialize(list, new JsonSerializerOptions { WriteIndented = true });
-                File.WriteAllText(_charactersPath, json);
-                return true;
-            }
+            string? error;
+            return Create(username, email, password, out error);
         }
     }
 }

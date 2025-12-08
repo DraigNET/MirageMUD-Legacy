@@ -1,4 +1,6 @@
 ﻿using Client.Game;
+using Shared.Data;
+using Shared.Enums;
 using Shared.Models;
 using System;
 using System.Collections.Generic;
@@ -82,6 +84,9 @@ namespace Client.Forms
         private TimeSpan? _lastLatency;
         private bool _loginBusy;
 
+        // --- New Character state ---
+        private int _newCharAvatar = 0;
+
         private sealed record CharItem(string Id, string Display)
         {
             public override string ToString() => Display;
@@ -158,8 +163,21 @@ namespace Client.Forms
 
             // --- Characters menu actions (wire now; logic later) ---
             AddNav(lblCharsNew, MenuView.NewCharacter);
-            // lblCharsUse -> proceed into game world (hook when ready)
-            // lblCharsDelete -> confirm + server call
+            // --- New Character panel wiring ---
+            InitializeNewCharacterPanel();
+
+            // Create
+            AddAction(lblNewCharCreate, async () => await CreateNewCharacterAsync());
+
+            // Cancel → back to character list
+            AddAction(lblNewCharCancel, () => _nav.ResetTo(MenuView.Characters));
+
+            // Avatar cycling (for now just changes an int; can later hook to images)
+            AddAction(lblAvatarPrev, () => ChangeAvatar(-1));
+            AddAction(lblAvatarNext, () => ChangeAvatar(1));
+
+            // Update stats when class changes
+            cmbClass.SelectedIndexChanged += (_, __) => UpdateNewCharStats();
 
             // send login when the user clicks Connect on the Login panel
             AddAction(lblLoginConnect, async () => await LoginConnectAsync());
@@ -252,7 +270,7 @@ namespace Client.Forms
                 foreach (var c in characters)
                     lstChars.Items.Add(new CharItem(
                         c.Id,
-                        $"{c.Name} [{c.Class}] - Level: {c.Level}"
+                        $"{c.Name} [{c.ClassName}] - Level: {c.Level}"
                     ));
             }
             finally { lstChars.EndUpdate(); }
@@ -381,7 +399,7 @@ namespace Client.Forms
             {
                 var username = txtNewAcctName.Text.Trim();
                 var email = txtNewAcctEmail.Text.Trim();
-                var password = txtNewAcctEmail.Text;
+                var password = txtNewAcctPassword.Text;
 
                 if (string.IsNullOrWhiteSpace(username) ||
                     string.IsNullOrWhiteSpace(email) ||
@@ -408,6 +426,137 @@ namespace Client.Forms
             catch (Exception ex)
             {
                 MessageBox.Show(this, $"Failed to register: {ex.Message}", "Error",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+        private void InitializeNewCharacterPanel()
+        {
+            // Populate class dropdown from enum
+            cmbClass.Items.Clear();
+
+            foreach (CharacterClass cls in Enum.GetValues(typeof(CharacterClass)))
+            {
+                cmbClass.Items.Add(cls);
+            }
+
+            if (cmbClass.Items.Count > 0)
+            {
+                cmbClass.SelectedIndex = 0;
+            }
+
+            // Default gender
+            optMale.Checked = true;
+
+            // Default avatar index
+            _newCharAvatar = 0;
+
+            UpdateNewCharStats();
+        }
+
+        private void UpdateNewCharStats()
+        {
+            if (cmbClass.SelectedItem is not CharacterClass cls)
+            {
+                lblSTR.Text = "0";
+                lblDEF.Text = "0";
+                lblMAGI.Text = "0";
+                lblSPEED.Text = "0";
+                lblHP.Text = "0";
+                lblMP.Text = "0";
+                lblSP.Text = "0";
+                return;
+            }
+
+            if (!ClassDefinitions.Stats.TryGetValue(cls, out var baseStats))
+            {
+                // Fallback if class not defined in ClassDefinitions
+                lblSTR.Text = "0";
+                lblDEF.Text = "0";
+                lblMAGI.Text = "0";
+                lblSPEED.Text = "0";
+                lblHP.Text = "0";
+                lblMP.Text = "0";
+                lblSP.Text = "0";
+                return;
+            }
+
+            // Map stats: STR/DEF/MAGI/SPEED
+            lblSTR.Text = baseStats.Str.ToString();
+            lblDEF.Text = baseStats.Con.ToString();
+            lblMAGI.Text = baseStats.Int.ToString();
+            lblSPEED.Text = baseStats.Dex.ToString();
+
+            // Mirror server formulas for vitals
+            int hp = 10 + baseStats.Con * 2;
+            int mp = 5 + baseStats.Int * 2 + baseStats.Wis;
+            int sp = 5 + baseStats.Con;
+
+            lblHP.Text = hp.ToString();
+            lblMP.Text = mp.ToString();
+            lblSP.Text = sp.ToString();
+        }
+
+        private void ChangeAvatar(int delta)
+        {
+            _newCharAvatar += delta;
+
+            // Clamp to a sensible range for now (0–9)
+            if (_newCharAvatar < 0)
+            {
+                _newCharAvatar = 9;
+            }
+            else if (_newCharAvatar > 9)
+            {
+                _newCharAvatar = 0;
+            }
+
+            // TODO: when you add actual avatar images, update picPic.Image here
+            // For now we could optionally reflect index in tooltip:
+            picPic.Tag = _newCharAvatar;
+        }
+
+        private async Task CreateNewCharacterAsync()
+        {
+            try
+            {
+                var name = txtNewCharName.Text.Trim();
+
+                if (string.IsNullOrWhiteSpace(name))
+                {
+                    MessageBox.Show(this, "Please enter a character name.", "New Character",
+                        MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+
+                if (cmbClass.SelectedItem is not CharacterClass cls)
+                {
+                    MessageBox.Show(this, "Please choose a class.", "New Character",
+                        MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+
+                var gender = optFemale.Checked ? Gender.Female : Gender.Male;
+                var avatar = _newCharAvatar;
+
+                if (!_client.IsConnected)
+                {
+                    var ok = await _client.TryConnectAsync(_config);
+                    if (!ok)
+                    {
+                        MessageBox.Show(this, "Could not connect to server.", "New Character",
+                            MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        return;
+                    }
+                }
+
+                await ClientGameLogic.SendNewCharacter(_client, name, cls, gender, avatar);
+                // Server replies with a fresh SAllChars; ShowCharacters(...) will update the UI.
+
+                _nav.ResetTo(MenuView.Characters);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, $"Failed to create character: {ex.Message}", "Error",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }

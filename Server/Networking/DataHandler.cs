@@ -1,5 +1,6 @@
 ﻿using Server.Database;
 using Server.Game;
+using Shared.Enums;
 using Shared.Models;
 using Shared.Networking;
 using Shared.Security;
@@ -82,6 +83,42 @@ namespace Server.Networking
                         break;
                     }
 
+                case ClientPacketId.CAddChar:
+                    {
+                        using var ms = new MemoryStream(payload.ToArray());
+                        using var br = new BinaryReader(ms, Encoding.UTF8);
+
+                        var name = br.ReadString();
+                        var classId = (CharacterClass)br.ReadInt32();
+                        var gender = (Gender)br.ReadInt32();
+                        var avatar = br.ReadInt32();
+
+                        if (!_tcp.TryGetAccount(clientId, out var accountUsername) || accountUsername is null)
+                        {
+                            _tcp.SendAlert(clientId, "Not logged in.");
+                            break;
+                        }
+
+                        var character = _logic.CreateCharacter(
+                            accountUsername,
+                            name,
+                            classId,
+                            gender,
+                            avatar,
+                            out var error
+                        );
+
+                        if (character == null)
+                        {
+                            _tcp.SendAlert(clientId, error ?? "Failed to create character.");
+                            break;
+                        }
+
+                        var list = _logic.GetCharacters(accountUsername);
+                        _tcp.SendAllChars(clientId, list);
+                        break;
+                    }
+
                 case ClientPacketId.CDelChar:
                     {
                         using var ms = new MemoryStream(payload.ToArray());
@@ -122,8 +159,11 @@ namespace Server.Networking
                             break;
                         }
 
-                        _tcp.SendLoginOk(clientId, true, "Account created.", account.Id);
-                        _tcp.SendAllChars(clientId, new List<CharacterSummary>());
+                        _tcp.SetAccount(clientId, account.Username);
+                        _tcp.SendLoginOk(clientId, true, "Account created.", account.Username);
+
+                        var summaries = _logic.GetCharacters(account.Username);
+                        _tcp.SendAllChars(clientId, summaries);
                         break;
                     }
             }

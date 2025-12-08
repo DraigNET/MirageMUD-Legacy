@@ -29,7 +29,6 @@ namespace Client.Forms
         private Label lblNewAccountInfo;
         private Label lblNewAccountName;
         private Label lblNewAccountEmail;
-        private Label lblNewAccountConnect;
         private Label lblNewAccountCancel;
 
         // Characters controls
@@ -152,7 +151,6 @@ namespace Client.Forms
             txtNewAcctName = new TextBox();
             lblNewAccountEmail = new Label();
             txtNewAcctEmail = new TextBox();
-            lblNewAccountConnect = new Label();
             lblNewAccountCancel = new Label();
             mnuChars = new Panel();
             lstChars = new ListBox();
@@ -199,6 +197,7 @@ namespace Client.Forms
             lblMainMenu_Login = new Label();
             lblMainMenu_GameOptions = new Label();
             lblMainMenu_IPConfig = new Label();
+            lblNewAccountConnect = new Label();
             mnuNewCharacter.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)picPic).BeginInit();
             mnuNewAccount.SuspendLayout();
@@ -555,6 +554,7 @@ namespace Client.Forms
             // 
             mnuNewAccount.BackColor = Color.Black;
             mnuNewAccount.BackgroundImage = (Image)resources.GetObject("mnuNewAccount.BackgroundImage");
+            mnuNewAccount.Controls.Add(lblNewAccountConnect);
             mnuNewAccount.Controls.Add(label1);
             mnuNewAccount.Controls.Add(txtNewAcctPassword);
             mnuNewAccount.Controls.Add(lblNewAccountTitle);
@@ -563,7 +563,6 @@ namespace Client.Forms
             mnuNewAccount.Controls.Add(txtNewAcctName);
             mnuNewAccount.Controls.Add(lblNewAccountEmail);
             mnuNewAccount.Controls.Add(txtNewAcctEmail);
-            mnuNewAccount.Controls.Add(lblNewAccountConnect);
             mnuNewAccount.Controls.Add(lblNewAccountCancel);
             mnuNewAccount.Location = new Point(0, 0);
             mnuNewAccount.Name = "mnuNewAccount";
@@ -659,17 +658,6 @@ namespace Client.Forms
             txtNewAcctEmail.Name = "txtNewAcctEmail";
             txtNewAcctEmail.Size = new Size(185, 18);
             txtNewAcctEmail.TabIndex = 5;
-            // 
-            // lblNewAccountConnect
-            // 
-            lblNewAccountConnect.BackColor = Color.Transparent;
-            lblNewAccountConnect.ForeColor = Color.White;
-            lblNewAccountConnect.Location = new Point(311, 214);
-            lblNewAccountConnect.Name = "lblNewAccountConnect";
-            lblNewAccountConnect.Size = new Size(91, 19);
-            lblNewAccountConnect.TabIndex = 6;
-            lblNewAccountConnect.Text = "Connect";
-            lblNewAccountConnect.TextAlign = ContentAlignment.MiddleCenter;
             // 
             // lblNewAccountCancel
             // 
@@ -1210,6 +1198,17 @@ namespace Client.Forms
             lblMainMenu_IPConfig.Text = "IP Config";
             lblMainMenu_IPConfig.TextAlign = ContentAlignment.MiddleCenter;
             // 
+            // lblNewAccountConnect
+            // 
+            lblNewAccountConnect.BackColor = Color.Transparent;
+            lblNewAccountConnect.ForeColor = Color.White;
+            lblNewAccountConnect.Location = new Point(311, 217);
+            lblNewAccountConnect.Name = "lblNewAccountConnect";
+            lblNewAccountConnect.Size = new Size(91, 19);
+            lblNewAccountConnect.TabIndex = 10;
+            lblNewAccountConnect.Text = "Connect";
+            lblNewAccountConnect.TextAlign = ContentAlignment.MiddleCenter;
+            // 
             // MainMenuForm
             // 
             AutoScaleMode = AutoScaleMode.None;
@@ -1246,5 +1245,6 @@ namespace Client.Forms
         }
         private Label label1;
         private TextBox txtNewAcctPassword;
+        private Label lblNewAccountConnect;
     }
 }
