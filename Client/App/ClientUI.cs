@@ -6,6 +6,7 @@ namespace Client.App
     internal static class ClientUI
     {
         public static MainMenuForm? MainMenu { get; private set; }
+        public static Client.Forms.GameForm? Game { get; set; }
 
         public static void Attach(MainMenuForm form) => MainMenu = form;
 

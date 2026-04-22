@@ -68,7 +68,7 @@ namespace Client.Services
                         var raw = _buffer.PopPacket();
                         Console.WriteLine($"[NetworkClient] Dispatching packet of {raw.Length} bytes");
                         using var reader = new PacketReader(raw);
-                        DataHandler.Handle(reader);
+                        DataHandler.Handle(reader, this);
                     }
                 }
             }

@@ -40,13 +40,14 @@ namespace Shared.Networking
 
         private void TryExtractPackets()
         {
+            var lenBuf = new byte[4];
+
             while (_stream.Length - _stream.Position >= 4)
             {
                 long startPos = _stream.Position;
 
                 // Peek length (do not advance permanently)
-                Span<byte> lenBuf = stackalloc byte[4];
-                _stream.Read(lenBuf);
+                _stream.Read(lenBuf, 0, lenBuf.Length);
                 int length = BitConverter.ToInt32(lenBuf);
 
                 if (_stream.Length - _stream.Position >= length)

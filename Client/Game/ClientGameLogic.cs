@@ -55,5 +55,19 @@ namespace Client.Game
                 writer.Write(avatar);
             });
         }
+        public static async Task SendPlayerMove(NetworkClient client, Direction direction)
+        {
+            await client.SendAsync((int)ClientPacketId.CPlayerMove, writer =>
+            {
+                writer.Write((int)direction);
+            });
+        }
+        public static async Task SendSay(NetworkClient client, string text)
+        {
+            await client.SendAsync((int)ClientPacketId.CSayMsg, writer =>
+            {
+                writer.Write(text);
+            });
+        }
     }
 }

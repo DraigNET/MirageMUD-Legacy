@@ -1,20 +1,123 @@
-﻿using System;
+﻿using Client.App;
+using Client.Services;
+using Shared.Enums;
+using Shared.Networking;
 using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data;
-using System.Drawing;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace Client.Forms
 {
     public partial class GameForm : Form
     {
-        public GameForm()
+        private readonly NetworkClient _client;
+
+        public GameForm(NetworkClient client)
         {
             InitializeComponent();
+
+            _client = client;
+
+            KeyPreview = true;
+            KeyDown += GameForm_KeyDown;
+            txtMyChat.KeyDown += TxtMyChat_KeyDown;
+        }
+
+        private async void GameForm_KeyDown(object? sender, KeyEventArgs e)
+        {
+            Direction? dir = e.KeyCode switch
+            {
+                Keys.Up => Direction.North,
+                Keys.Right => Direction.East,
+                Keys.Down => Direction.South,
+                Keys.Left => Direction.West,
+                _ => null
+            };
+
+            if (dir is null)
+                return;
+
+            try
+            {
+                await Client.Game.ClientGameLogic.SendPlayerMove(_client, dir.Value);
+            }
+            catch
+            {
+                // ignore for now
+            }
+        }
+        private async void TxtMyChat_KeyDown(object? sender, KeyEventArgs e)
+        {
+            if (e.KeyCode != Keys.Enter)
+                return;
+
+            e.SuppressKeyPress = true;
+
+            var text = txtMyChat.Text.Trim();
+            if (text.Length == 0)
+                return;
+
+            txtMyChat.Clear();
+
+            try
+            {
+                await Client.Game.ClientGameLogic.SendSay(_client, text);
+            }
+            catch
+            {
+                // ignore for now
+            }
+        }
+        public void ApplyRoomSnapshot(
+            int roomId,
+            string name,
+            string description,
+            IReadOnlyList<string> exits,
+            IReadOnlyList<string> players,
+            IReadOnlyList<string> npcs,
+            IReadOnlyList<string> items)
+        {
+            // Room label
+            lblRoomNum.Text = roomId.ToString();
+
+            // Lists
+            lstPlayers.BeginUpdate();
+            lstPlayers.Items.Clear();
+            foreach (var p in players)
+                lstPlayers.Items.Add(p);
+            lstPlayers.EndUpdate();
+
+            lstNPCs.BeginUpdate();
+            lstNPCs.Items.Clear();
+            foreach (var n in npcs)
+                lstNPCs.Items.Add(n);
+            lstNPCs.EndUpdate();
+
+            lstItems.BeginUpdate();
+            lstItems.Items.Clear();
+            foreach (var i in items)
+                lstItems.Items.Add(i);
+            lstItems.EndUpdate();
+
+            // Chat output (Mirage-style: room header + description + exits)
+            AppendChatLine($"[{roomId}] {name}");
+            if (!string.IsNullOrWhiteSpace(description))
+                AppendChatLine(description);
+
+            if (exits.Count > 0)
+                AppendChatLine($"Exits: {string.Join(", ", exits)}");
+            else
+                AppendChatLine("Exits: none");
+
+            AppendChatLine(string.Empty);
+        }
+        public void AppendChatLine(string text)
+        {
+            if (txtChat.TextLength > 0)
+                txtChat.AppendText(Environment.NewLine);
+
+            txtChat.AppendText(text ?? string.Empty);
+            txtChat.SelectionStart = txtChat.TextLength;
+            txtChat.ScrollToCaret();
         }
     }
 }

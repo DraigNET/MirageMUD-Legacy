@@ -1,14 +1,17 @@
 ﻿using Client.App;
+using Client.Services;
 using Shared.Enums;
 using Shared.Models;
 using Shared.Networking;
 using System;
+using System.Collections.Generic;
+using System.Windows.Forms;
 
 namespace Client.Game
 {
     public static class DataHandler
     {
-        public static void Handle(PacketReader reader)
+        public static void Handle(PacketReader reader, NetworkClient client)
         {
             switch ((ServerPacketId)reader.Id)
             {
@@ -21,12 +24,27 @@ namespace Client.Game
                         });
                         break;
                     }
+
+                case ServerPacketId.SSayMsg:
+                    {
+                        string from = reader.ReadString();
+                        string message = reader.ReadString();
+
+                        ClientUI.OnUI(() =>
+                        {
+                            ClientUI.Game?.AppendChatLine($"{from}: {message}");
+                        });
+
+                        break;
+                    }
+
                 case ServerPacketId.SSync:
                     {
                         _ = reader.ReadString(); // ignore payload
                         Client.App.ClientUI.OnUI(() => Client.App.ClientUI.MainMenu?.OnPong(DateTime.UtcNow));
                         break;
                     }
+
                 case ServerPacketId.SLoginOk:
                     {
                         bool ok = reader.ReadBool();
@@ -71,26 +89,80 @@ namespace Client.Game
                         ClientUI.OnUI(() => ClientUI.MainMenu!.ShowCharacters(chars));
                         break;
                     }
-                default:
+
+                case ServerPacketId.SRoomData:
                     {
-                        Console.WriteLine($"[Client] Unhandled server packet: {reader.Id}");
+                        int roomId = reader.ReadInt();
+                        string name = reader.ReadString();
+                        string description = reader.ReadString();
+
+                        int exitCount = reader.ReadInt();
+                        var exits = new List<string>(exitCount);
+                        for (int i = 0; i < exitCount; i++)
+                            exits.Add(reader.ReadString());
+
+                        int playerCount = reader.ReadInt();
+                        var players = new List<string>(playerCount);
+                        for (int i = 0; i < playerCount; i++)
+                            players.Add(reader.ReadString());
+
+                        int npcCount = reader.ReadInt();
+                        var npcs = new List<string>(npcCount);
+                        for (int i = 0; i < npcCount; i++)
+                            npcs.Add(reader.ReadString());
+
+                        int itemCount = reader.ReadInt();
+                        var items = new List<string>(itemCount);
+                        for (int i = 0; i < itemCount; i++)
+                            items.Add(reader.ReadString());
+
+                        ClientUI.OnUI(() =>
+                        {
+                            ClientUI.Game?.ApplyRoomSnapshot(
+                                roomId,
+                                name,
+                                description,
+                                exits,
+                                players,
+                                npcs,
+                                items
+                            );
+                        });
+
+                        break;
+                    }
+
+                case ServerPacketId.SRoomDone:
+                    {
+                        // Mirage-style end-of-room marker.
+                        // We don't need to do anything here yet.
                         break;
                     }
 
                 case ServerPacketId.SInGame:
-                    // Switch to the game window
-                    Client.App.ClientUI.OnUI(() =>
+                    ClientUI.OnUI(() =>
                     {
-                        var main = Client.App.ClientUI.MainMenu!;
-                        var game = new Client.Forms.GameForm();
+                        var main = ClientUI.MainMenu!;
+                        var game = new Client.Forms.GameForm(client);
 
-                        // If you want to return to menu when game closes:
-                        game.FormClosed += (_, __) => main.Show();
+                        ClientUI.Game = game;
+
+                        game.FormClosed += (_, __) =>
+                        {
+                            ClientUI.Game = null;
+                            main.Show();
+                        };
 
                         main.Hide();
                         game.Show();
                     });
                     break;
+
+                default:
+                    {
+                        Console.WriteLine($"[Client] Unhandled server packet: {reader.Id}");
+                        break;
+                    }
             }
         }
     }

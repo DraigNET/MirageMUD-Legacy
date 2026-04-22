@@ -33,5 +33,33 @@ namespace Server.Networking
                 characterId = c.CharacterId;
             return characterId != null;
         }
+
+        public bool IsCharacterActive(string characterId, int? excludingClientId = null)
+        {
+            foreach (var kv in _clients)
+            {
+                if (excludingClientId.HasValue && kv.Key == excludingClientId.Value)
+                    continue;
+
+                if (string.Equals(kv.Value.CharacterId, characterId, StringComparison.Ordinal))
+                    return true;
+            }
+
+            return false;
+        }
+
+        public IReadOnlyList<int> GetClientIdsForCharacters(IEnumerable<string> characterIds)
+        {
+            var ids = new HashSet<string>(characterIds, StringComparer.Ordinal);
+            var clientIds = new List<int>();
+
+            foreach (var kv in _clients)
+            {
+                if (kv.Value.CharacterId is string characterId && ids.Contains(characterId))
+                    clientIds.Add(kv.Key);
+            }
+
+            return clientIds;
+        }
     }
 }

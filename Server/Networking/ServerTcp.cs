@@ -49,5 +49,12 @@ namespace Server.Networking
             w.Write(msg ?? "");
             SendBytes(clientId, w.ToArray());
         }
+        public void SendSayMsg(int clientId, string from, string message)
+        {
+            using var writer = new PacketWriter((int)ServerPacketId.SSayMsg);
+            writer.Write(from);
+            writer.Write(message);
+            SendBytes(clientId, writer.ToArray());
+        }
     }
 }

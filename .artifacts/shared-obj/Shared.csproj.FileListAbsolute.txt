@@ -1,0 +1,12 @@
+f:\Programming\Projects\C#\MirageMUD1\.artifacts\shared-bin\Shared.deps.json
+f:\Programming\Projects\C#\MirageMUD1\.artifacts\shared-bin\Shared.dll
+f:\Programming\Projects\C#\MirageMUD1\.artifacts\shared-bin\Shared.pdb
+f:\Programming\Projects\C#\MirageMUD1\.artifacts\shared-obj\Shared.GeneratedMSBuildEditorConfig.editorconfig
+f:\Programming\Projects\C#\MirageMUD1\.artifacts\shared-obj\Shared.AssemblyInfoInputs.cache
+f:\Programming\Projects\C#\MirageMUD1\.artifacts\shared-obj\Shared.AssemblyInfo.cs
+f:\Programming\Projects\C#\MirageMUD1\.artifacts\shared-obj\Shared.csproj.CoreCompileInputs.cache
+f:\Programming\Projects\C#\MirageMUD1\.artifacts\shared-obj\Shared.sourcelink.json
+f:\Programming\Projects\C#\MirageMUD1\.artifacts\shared-obj\Shared.dll
+f:\Programming\Projects\C#\MirageMUD1\.artifacts\shared-obj\refint\Shared.dll
+f:\Programming\Projects\C#\MirageMUD1\.artifacts\shared-obj\Shared.pdb
+f:\Programming\Projects\C#\MirageMUD1\.artifacts\shared-obj\ref\Shared.dll

@@ -18,6 +18,7 @@ namespace Server.Networking
         private CancellationTokenSource? _cts;
 
         public event Action<int, ClientPacketId, ReadOnlyMemory<byte>>? OnPacket;
+        public event Action<int, string?, string?>? OnClientDisconnected;
 
         public ServerTcp() : this(IPAddress.Any, 5000) { } // match your client default port
 
@@ -135,7 +136,10 @@ namespace Server.Networking
         {
             if (_clients.TryRemove(clientId, out var c))
             {
+                var accountId = c.AccountId;
+                var characterId = c.CharacterId;
                 c.Dispose();
+                OnClientDisconnected?.Invoke(clientId, accountId, characterId);
                 Console.WriteLine($"[ServerTcp] Client {clientId} disconnected.");
             }
         }
@@ -164,7 +168,7 @@ namespace Server.Networking
         }
 
         // Implements the SendBytes() declared in your other partial
-        private void SendBytes(int clientId, byte[] data)
+        public void SendBytes(int clientId, byte[] data)
         {
             if (_clients.TryGetValue(clientId, out var c))
             {

@@ -19,7 +19,8 @@ namespace Shared.Models
                 Id = c.Id,
                 Name = c.Name,
                 Level = c.Level,
-                ClassId = c.ClassId
+                ClassId = c.ClassId,
+                GenderId = (int)c.Gender
             };
     }
 }

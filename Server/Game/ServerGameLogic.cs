@@ -26,6 +26,29 @@ namespace Server.Game
         public bool DeleteCharacter(string username, string characterId)
             => _accounts.DeleteCharacter(username, characterId);
 
+        public Character? GetCharacter(string username, string characterId)
+        {
+            var account = _accounts.GetByUsername(username);
+            return account?.Characters.FirstOrDefault(c => c.Id == characterId);
+        }
+
+        public bool UpdateCharacterLocation(string username, string characterId, int roomId, Direction direction)
+        {
+            var account = _accounts.GetByUsername(username);
+            if (account == null)
+                return false;
+
+            var character = account.Characters.FirstOrDefault(c => c.Id == characterId);
+            if (character == null)
+                return false;
+
+            character.RoomId = roomId;
+            character.Direction = (int)direction;
+
+            _accounts.Save(account);
+            return true;
+        }
+
         public LoginResponseDto HandleLogin(LoginRequestDto req)
         {
             // Try username first, then email
@@ -169,8 +192,11 @@ namespace Server.Game
             character.Vitals[(int)VitalType.Stamina] = 5 + baseStats.Con;
 
             // Save to account
-            if (!_accounts.AddCharacter(accountUsername, character, out error))
+            if (!_accounts.AddCharacter(accountUsername, character, out var addCharacterError))
+            {
+                error = addCharacterError ?? "Failed to save character.";
                 return null;
+            }
 
             return character;
         }
