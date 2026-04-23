@@ -1,0 +1,20 @@
+[
+  {
+    "id": "snake",
+    "name": "Snake",
+    "level": 1,
+    "maxHP": 8,
+    "minDamage": 1,
+    "maxDamage": 2,
+    "respawnSeconds": 10
+  },
+  {
+    "id": "rat",
+    "name": "Rat",
+    "level": 1,
+    "maxHP": 6,
+    "minDamage": 1,
+    "maxDamage": 1,
+    "respawnSeconds": 8
+  }
+]

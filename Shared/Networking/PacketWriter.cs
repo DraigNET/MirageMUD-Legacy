@@ -20,6 +20,7 @@ namespace Shared.Networking
         }
 
         public void Write(int value) => _writer.Write(value);
+        public void Write(long value) => _writer.Write(value);
         public void Write(string value) => _writer.Write(value ?? string.Empty);
         public void Write(bool value) => _writer.Write(value);
         public void Write(byte value) => _writer.Write(value);

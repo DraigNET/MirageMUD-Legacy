@@ -1,74 +1,52 @@
 using Server.Models;
 using Shared.Enums;
+using Shared.Models;
 
 namespace Server.World
 {
     public sealed class WorldService
     {
+        private readonly WorldRepository _repository;
         private readonly Dictionary<int, RoomDefinition> _rooms = new();
+        private readonly Dictionary<string, NPC> _npcDefinitions = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, NpcInstance> _npcInstances = new(StringComparer.Ordinal);
         private readonly Dictionary<int, HashSet<string>> _roomOccupants = new();
+        private readonly Dictionary<int, HashSet<string>> _roomNpcs = new();
         private readonly Dictionary<string, int> _characterRooms = new();
         private readonly Dictionary<string, string> _characterNames = new();
         private readonly Dictionary<string, Direction> _characterDirections = new();
+        private int _nextNpcInstanceId;
+
+        public WorldService(WorldRepository repository)
+        {
+            _repository = repository;
+        }
 
         public void Boot()
         {
             _rooms.Clear();
+            _npcDefinitions.Clear();
+            _npcInstances.Clear();
             _roomOccupants.Clear();
+            _roomNpcs.Clear();
             _characterRooms.Clear();
             _characterNames.Clear();
             _characterDirections.Clear();
+            _nextNpcInstanceId = 0;
 
-            AddRoom(new RoomDefinition
-            {
-                Id = 1,
-                Name = "Town Square",
-                Description = "You are standing in the town square. Old stone streets branch out in every direction.",
-                Exits = new Dictionary<string, int>
-                {
-                    ["N"] = 2,
-                    ["E"] = 3,
-                    ["W"] = 4
-                }
-            });
+            foreach (var room in _repository.LoadRooms())
+                AddRoom(room);
 
-            AddRoom(new RoomDefinition
-            {
-                Id = 2,
-                Name = "North Gate",
-                Description = "A heavy gate towers above the northern road. Guards keep a lazy watch nearby.",
-                Exits = new Dictionary<string, int>
-                {
-                    ["S"] = 1
-                }
-            });
+            foreach (var npc in _repository.LoadNpcs())
+                _npcDefinitions[npc.Id] = npc;
 
-            AddRoom(new RoomDefinition
-            {
-                Id = 3,
-                Name = "Market Street",
-                Description = "Canvas stalls crowd the lane, though most of the merchants have already packed up for the day.",
-                Exits = new Dictionary<string, int>
-                {
-                    ["W"] = 1
-                }
-            });
+            SpawnMissingRoomNpcs();
 
-            AddRoom(new RoomDefinition
-            {
-                Id = 4,
-                Name = "West Dock",
-                Description = "Dark water laps against weathered pilings. The river smells of rain and old trade routes.",
-                Exits = new Dictionary<string, int>
-                {
-                    ["E"] = 1
-                }
-            });
-
-            Console.WriteLine($"[World] Booted {_rooms.Count} rooms.");
+            Console.WriteLine($"[World] Booted {_rooms.Count} rooms and {_npcDefinitions.Count} NPC templates.");
         }
 
         public bool HasRoom(int roomId) => _rooms.ContainsKey(roomId);
+        public int DefaultRoomId => _rooms.Keys.OrderBy(id => id).FirstOrDefault(1);
 
         public void EnterRoom(string characterId, string characterName, int roomId, Direction direction = Direction.South)
         {
@@ -110,6 +88,48 @@ namespace Server.World
                 return Array.Empty<string>();
 
             return occupants.ToList();
+        }
+
+        public IReadOnlyList<NpcInstanceView> GetNpcsInRoom(int roomId)
+        {
+            if (!_roomNpcs.TryGetValue(roomId, out var npcIds))
+                return Array.Empty<NpcInstanceView>();
+
+            var baseEntries = npcIds
+                .Select(id => BuildNpcEntry(id))
+                .Where(entry => entry != null)
+                .Select(entry => entry!.Value)
+                .OrderBy(entry => entry.BaseName, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(entry => entry.InstanceId, StringComparer.Ordinal)
+                .ToList();
+
+            if (baseEntries.Count == 0)
+                return Array.Empty<NpcInstanceView>();
+
+            var counters = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            var totals = baseEntries
+                .GroupBy(entry => entry.BaseName, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(group => group.Key, group => group.Count(), StringComparer.OrdinalIgnoreCase);
+
+            var views = new List<NpcInstanceView>(baseEntries.Count);
+            foreach (var entry in baseEntries)
+            {
+                counters.TryGetValue(entry.BaseName, out var currentCount);
+                currentCount++;
+                counters[entry.BaseName] = currentCount;
+
+                var displayName = totals[entry.BaseName] > 1
+                    ? $"{entry.BaseName} ({currentCount})"
+                    : entry.BaseName;
+
+                views.Add(new NpcInstanceView
+                {
+                    InstanceId = entry.InstanceId,
+                    DisplayName = displayName
+                });
+            }
+
+            return views;
         }
 
         public bool TryMove(string characterId, Direction direction, out RoomSnapshot snapshot)
@@ -170,19 +190,66 @@ namespace Server.World
                 Description = def.Description,
                 Exits = def.Exits.Keys.Select(ToExitDisplayName).ToList(),
                 Players = occupants,
-                Npcs = Array.Empty<string>(),
+                Npcs = GetNpcsInRoom(roomId),
                 Items = Array.Empty<string>()
             };
         }
 
         public void FastTick() { }
         public void SlowTick() { }
-        public void SpawnTick() { }
+        public void SpawnTick() => SpawnMissingRoomNpcs();
 
         private void AddRoom(RoomDefinition room)
         {
             _rooms[room.Id] = room;
             _roomOccupants[room.Id] = new HashSet<string>(StringComparer.Ordinal);
+            _roomNpcs[room.Id] = new HashSet<string>(StringComparer.Ordinal);
+        }
+
+        private void SpawnMissingRoomNpcs()
+        {
+            foreach (var room in _rooms.Values)
+            {
+                foreach (var spawn in room.NpcSpawns)
+                {
+                    if (!_npcDefinitions.TryGetValue(spawn.NpcId, out var npcDefinition))
+                        continue;
+
+                    var existingCount = _roomNpcs[room.Id]
+                        .Select(id => _npcInstances.TryGetValue(id, out var instance) ? instance : null)
+                        .Count(instance => instance != null && string.Equals(instance.NpcId, npcDefinition.Id, StringComparison.OrdinalIgnoreCase));
+
+                    var needed = Math.Max(0, spawn.Count - existingCount);
+                    for (var i = 0; i < needed; i++)
+                        SpawnNpc(room.Id, npcDefinition);
+                }
+            }
+        }
+
+        private void SpawnNpc(int roomId, NPC definition)
+        {
+            var instanceId = $"npc_{roomId}_{++_nextNpcInstanceId:D4}";
+            var instance = new NpcInstance
+            {
+                InstanceId = instanceId,
+                NpcId = definition.Id,
+                RoomId = roomId,
+                CurrentHP = definition.MaxHP
+            };
+
+            _npcInstances[instanceId] = instance;
+            _roomNpcs[roomId].Add(instanceId);
+        }
+
+        private (string InstanceId, string BaseName)? BuildNpcEntry(string instanceId)
+        {
+            if (!_npcInstances.TryGetValue(instanceId, out var instance))
+                return null;
+
+            if (!_npcDefinitions.TryGetValue(instance.NpcId, out var definition))
+                return null;
+
+            return (instance.InstanceId, definition.Name);
         }
 
         private static string ToExitDisplayName(string exitKey) => exitKey.ToUpperInvariant() switch

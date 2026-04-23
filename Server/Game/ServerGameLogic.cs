@@ -49,6 +49,38 @@ namespace Server.Game
             return true;
         }
 
+        public (int Current, int Max) GetVital(Character character, VitalType vital)
+        {
+            var max = vital switch
+            {
+                VitalType.HP => 10 + character.Constitution * 2,
+                VitalType.Mana => 5 + character.Intelligence * 2 + character.Wisdom,
+                VitalType.Stamina => 5 + character.Constitution,
+                _ => 0
+            };
+
+            var current = character.Vitals.Length > (int)vital
+                ? Math.Clamp(character.Vitals[(int)vital], 0, max)
+                : 0;
+
+            return (current, max);
+        }
+
+        public long GetNextLevelExperience(Character character)
+            => Math.Max(100L, character.Level * 100L);
+
+        public (int Strength, int Defense, int Magi, int Speed, int CritHit, int BlockChance) GetDerivedStats(Character character)
+        {
+            var strength = character.Strength;
+            var defense = character.Constitution;
+            var magi = character.Intelligence;
+            var speed = character.Dexterity;
+            var critHit = Math.Clamp(speed * 2 + Math.Max(0, character.Level - 1), 0, 95);
+            var blockChance = Math.Clamp(defense * 2 + character.Wisdom, 0, 95);
+
+            return (strength, defense, magi, speed, critHit, blockChance);
+        }
+
         public LoginResponseDto HandleLogin(LoginRequestDto req)
         {
             // Try username first, then email

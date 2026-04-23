@@ -13,5 +13,7 @@
         /// Value is destination room id.
         /// </summary>
         public Dictionary<string, int> Exits { get; set; } = new();
+
+        public List<NpcSpawnDefinition> NpcSpawns { get; set; } = new();
     }
 }

@@ -15,3 +15,5 @@ f:\Programming\Projects\C#\MirageMUD1\.artifacts\server-obj\refint\Server.dll
 f:\Programming\Projects\C#\MirageMUD1\.artifacts\server-obj\Server.pdb
 f:\Programming\Projects\C#\MirageMUD1\.artifacts\server-obj\Server.genruntimeconfig.cache
 f:\Programming\Projects\C#\MirageMUD1\.artifacts\server-obj\ref\Server.dll
+f:\Programming\Projects\C#\MirageMUD1\.artifacts\server-bin\Data\World\rooms.json
+f:\Programming\Projects\C#\MirageMUD1\.artifacts\server-bin\Data\World\npcs.json

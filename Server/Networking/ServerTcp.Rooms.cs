@@ -26,7 +26,10 @@ namespace Server.Networking
             // NPCs
             w.Write(room.Npcs.Count);
             foreach (var npc in room.Npcs)
-                w.Write(npc);
+            {
+                w.Write(npc.InstanceId);
+                w.Write(npc.DisplayName);
+            }
 
             // Items
             w.Write(room.Items.Count);

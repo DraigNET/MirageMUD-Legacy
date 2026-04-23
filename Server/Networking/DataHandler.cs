@@ -95,6 +95,7 @@ namespace Server.Networking
 
                     _tcp.SetCharacter(clientId, charId);
                     _tcp.SendInGame(clientId);
+                    SendPlayerState(clientId, accountId, charId);
                     _tcp.SendRoomSnapshot(clientId, snapshot);
 
                     var name = _world.GetCharacterName(charId) ?? "Someone";
@@ -324,6 +325,25 @@ namespace Server.Networking
 
                 _tcp.SendSayMsg(targetClientId, from, message);
             }
+        }
+
+        private void SendPlayerState(int clientId, string accountId, string characterId)
+        {
+            var character = _logic.GetCharacter(accountId, characterId);
+            if (character == null)
+                return;
+
+            var nextLevelExperience = _logic.GetNextLevelExperience(character);
+            var stats = _logic.GetDerivedStats(character);
+            var hp = _logic.GetVital(character, VitalType.HP);
+            var mp = _logic.GetVital(character, VitalType.Mana);
+            var stamina = _logic.GetVital(character, VitalType.Stamina);
+
+            _tcp.SendPlayerData(clientId, character, nextLevelExperience);
+            _tcp.SendPlayerStats(clientId, stats.Strength, stats.Defense, stats.Magi, stats.Speed, stats.CritHit, stats.BlockChance);
+            _tcp.SendPlayerHp(clientId, hp.Current, hp.Max);
+            _tcp.SendPlayerMp(clientId, mp.Current, mp.Max);
+            _tcp.SendPlayerStamina(clientId, stamina.Current, stamina.Max);
         }
 
         private static Direction GetOppositeDirection(Direction direction) => direction switch

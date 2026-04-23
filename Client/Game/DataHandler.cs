@@ -20,7 +20,14 @@ namespace Client.Game
                         string alert = reader.ReadString();
                         ClientUI.OnUI(() =>
                         {
-                            MessageBox.Show(alert, "Server Message", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                            if (ClientUI.Game != null)
+                            {
+                                ClientUI.Game.AppendChatLine($"System: {alert}");
+                            }
+                            else
+                            {
+                                MessageBox.Show(alert, "Server Message", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                            }
                         });
                         break;
                     }
@@ -107,9 +114,18 @@ namespace Client.Game
                             players.Add(reader.ReadString());
 
                         int npcCount = reader.ReadInt();
-                        var npcs = new List<string>(npcCount);
+                        var npcs = new List<NpcInstanceView>(npcCount);
                         for (int i = 0; i < npcCount; i++)
-                            npcs.Add(reader.ReadString());
+                        {
+                            var instanceId = reader.ReadString();
+                            var displayName = reader.ReadString();
+
+                            npcs.Add(new NpcInstanceView
+                            {
+                                InstanceId = instanceId,
+                                DisplayName = displayName
+                            });
+                        }
 
                         int itemCount = reader.ReadInt();
                         var items = new List<string>(itemCount);
@@ -129,6 +145,66 @@ namespace Client.Game
                             );
                         });
 
+                        break;
+                    }
+
+                case ServerPacketId.SPlayerData:
+                    {
+                        var name = reader.ReadString();
+                        var classId = reader.ReadInt();
+                        var level = reader.ReadInt();
+                        var experience = reader.ReadLong();
+                        var nextLevelExperience = reader.ReadLong();
+
+                        ClientUI.OnUI(() =>
+                        {
+                            ClientUI.Game?.ApplyPlayerData(name, classId, level, experience, nextLevelExperience);
+                        });
+
+                        break;
+                    }
+
+                case ServerPacketId.SPlayerStats:
+                    {
+                        var strength = reader.ReadInt();
+                        var defense = reader.ReadInt();
+                        var magi = reader.ReadInt();
+                        var speed = reader.ReadInt();
+                        var critHit = reader.ReadInt();
+                        var blockChance = reader.ReadInt();
+
+                        ClientUI.OnUI(() =>
+                        {
+                            ClientUI.Game?.ApplyPlayerStats(strength, defense, magi, speed, critHit, blockChance);
+                        });
+
+                        break;
+                    }
+
+                case ServerPacketId.SPlayerHp:
+                    {
+                        var current = reader.ReadInt();
+                        var max = reader.ReadInt();
+
+                        ClientUI.OnUI(() => ClientUI.Game?.ApplyHp(current, max));
+                        break;
+                    }
+
+                case ServerPacketId.SPlayerMp:
+                    {
+                        var current = reader.ReadInt();
+                        var max = reader.ReadInt();
+
+                        ClientUI.OnUI(() => ClientUI.Game?.ApplyMp(current, max));
+                        break;
+                    }
+
+                case ServerPacketId.SPlayerStamina:
+                    {
+                        var current = reader.ReadInt();
+                        var max = reader.ReadInt();
+
+                        ClientUI.OnUI(() => ClientUI.Game?.ApplyStamina(current, max));
                         break;
                     }
 

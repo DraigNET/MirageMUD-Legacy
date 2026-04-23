@@ -12,6 +12,7 @@ namespace Server
         private readonly JsonAccountRepository _accounts;
         private readonly ServerGameLogic _logic;
 
+        private readonly WorldRepository _worldRepository;
         private readonly WorldService _world;
         private readonly ServerTcp _tcp;
         private readonly DataHandler _handler;
@@ -27,7 +28,8 @@ namespace Server
             _logic = new ServerGameLogic(_accounts);
 
             // World (definitions + runtime state)
-            _world = new WorldService();
+            _worldRepository = new WorldRepository(dataDir);
+            _world = new WorldService(_worldRepository);
 
             // Networking
             _tcp = new ServerTcp(_config);

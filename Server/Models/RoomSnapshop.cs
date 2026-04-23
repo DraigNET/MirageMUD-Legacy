@@ -1,4 +1,6 @@
-﻿namespace Server.Models
+using Shared.Models;
+
+namespace Server.Models
 {
     public sealed class RoomSnapshot
     {
@@ -8,25 +10,12 @@
 
         public string Description { get; init; } = string.Empty;
 
-        /// <summary>
-        /// Available exits from this room (N, S, E, W, etc.)
-        /// </summary>
         public IReadOnlyList<string> Exits { get; init; } = Array.Empty<string>();
 
-        /// <summary>
-        /// Character names currently visible in the room.
-        /// (Later: include self flag, ids, etc.)
-        /// </summary>
         public IReadOnlyList<string> Players { get; init; } = Array.Empty<string>();
 
-        /// <summary>
-        /// NPC display names currently in the room.
-        /// </summary>
-        public IReadOnlyList<string> Npcs { get; init; } = Array.Empty<string>();
+        public IReadOnlyList<NpcInstanceView> Npcs { get; init; } = Array.Empty<NpcInstanceView>();
 
-        /// <summary>
-        /// Item display names currently in the room.
-        /// </summary>
         public IReadOnlyList<string> Items { get; init; } = Array.Empty<string>();
     }
 }

@@ -56,5 +56,52 @@ namespace Server.Networking
             writer.Write(message);
             SendBytes(clientId, writer.ToArray());
         }
+
+        public void SendPlayerData(int clientId, Character character, long nextLevelExperience)
+        {
+            using var writer = new PacketWriter((int)ServerPacketId.SPlayerData);
+            writer.Write(character.Name);
+            writer.Write(character.ClassId);
+            writer.Write(character.Level);
+            writer.Write(character.Experience);
+            writer.Write(nextLevelExperience);
+            SendBytes(clientId, writer.ToArray());
+        }
+
+        public void SendPlayerStats(int clientId, int strength, int defense, int magi, int speed, int critHit, int blockChance)
+        {
+            using var writer = new PacketWriter((int)ServerPacketId.SPlayerStats);
+            writer.Write(strength);
+            writer.Write(defense);
+            writer.Write(magi);
+            writer.Write(speed);
+            writer.Write(critHit);
+            writer.Write(blockChance);
+            SendBytes(clientId, writer.ToArray());
+        }
+
+        public void SendPlayerHp(int clientId, int current, int max)
+        {
+            using var writer = new PacketWriter((int)ServerPacketId.SPlayerHp);
+            writer.Write(current);
+            writer.Write(max);
+            SendBytes(clientId, writer.ToArray());
+        }
+
+        public void SendPlayerMp(int clientId, int current, int max)
+        {
+            using var writer = new PacketWriter((int)ServerPacketId.SPlayerMp);
+            writer.Write(current);
+            writer.Write(max);
+            SendBytes(clientId, writer.ToArray());
+        }
+
+        public void SendPlayerStamina(int clientId, int current, int max)
+        {
+            using var writer = new PacketWriter((int)ServerPacketId.SPlayerStamina);
+            writer.Write(current);
+            writer.Write(max);
+            SendBytes(clientId, writer.ToArray());
+        }
     }
 }

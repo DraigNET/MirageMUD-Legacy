@@ -1,0 +1,50 @@
+[
+  {
+    "id": 1,
+    "name": "Town Square",
+    "description": "You are standing in the town square. Old stone streets branch out in every direction.",
+    "exits": {
+      "N": 2,
+      "E": 3,
+      "W": 4
+    },
+    "npcSpawns": []
+  },
+  {
+    "id": 2,
+    "name": "North Gate",
+    "description": "A heavy gate towers above the northern road. Guards keep a lazy watch nearby.",
+    "exits": {
+      "S": 1
+    },
+    "npcSpawns": [
+      {
+        "npcId": "snake",
+        "count": 3
+      }
+    ]
+  },
+  {
+    "id": 3,
+    "name": "Market Street",
+    "description": "Canvas stalls crowd the lane, though most of the merchants have already packed up for the day.",
+    "exits": {
+      "W": 1
+    },
+    "npcSpawns": [
+      {
+        "npcId": "rat",
+        "count": 2
+      }
+    ]
+  },
+  {
+    "id": 4,
+    "name": "West Dock",
+    "description": "Dark water laps against weathered pilings. The river smells of rain and old trade routes.",
+    "exits": {
+      "E": 1
+    },
+    "npcSpawns": []
+  }
+]

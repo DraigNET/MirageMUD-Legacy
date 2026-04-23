@@ -1,6 +1,6 @@
-﻿using Client.App;
 using Client.Services;
 using Shared.Enums;
+using Shared.Models;
 using Shared.Networking;
 using System.Collections.Generic;
 using System.Windows.Forms;
@@ -10,6 +10,12 @@ namespace Client.Forms
     public partial class GameForm : Form
     {
         private readonly NetworkClient _client;
+        private string? _selectedNpcInstanceId;
+
+        private sealed record NpcListItem(string InstanceId, string DisplayName)
+        {
+            public override string ToString() => DisplayName;
+        }
 
         public GameForm(NetworkClient client)
         {
@@ -20,6 +26,7 @@ namespace Client.Forms
             KeyPreview = true;
             KeyDown += GameForm_KeyDown;
             txtMyChat.KeyDown += TxtMyChat_KeyDown;
+            lstNPCs.SelectedIndexChanged += LstNPCs_SelectedIndexChanged;
         }
 
         private async void GameForm_KeyDown(object? sender, KeyEventArgs e)
@@ -45,6 +52,7 @@ namespace Client.Forms
                 // ignore for now
             }
         }
+
         private async void TxtMyChat_KeyDown(object? sender, KeyEventArgs e)
         {
             if (e.KeyCode != Keys.Enter)
@@ -67,19 +75,20 @@ namespace Client.Forms
                 // ignore for now
             }
         }
+
         public void ApplyRoomSnapshot(
             int roomId,
             string name,
             string description,
             IReadOnlyList<string> exits,
             IReadOnlyList<string> players,
-            IReadOnlyList<string> npcs,
+            IReadOnlyList<NpcInstanceView> npcs,
             IReadOnlyList<string> items)
         {
-            // Room label
+            var previousNpcId = _selectedNpcInstanceId;
+
             lblRoomNum.Text = roomId.ToString();
 
-            // Lists
             lstPlayers.BeginUpdate();
             lstPlayers.Items.Clear();
             foreach (var p in players)
@@ -89,8 +98,23 @@ namespace Client.Forms
             lstNPCs.BeginUpdate();
             lstNPCs.Items.Clear();
             foreach (var n in npcs)
-                lstNPCs.Items.Add(n);
+                lstNPCs.Items.Add(new NpcListItem(n.InstanceId, n.DisplayName));
             lstNPCs.EndUpdate();
+
+            if (!string.IsNullOrWhiteSpace(previousNpcId))
+            {
+                for (var i = 0; i < lstNPCs.Items.Count; i++)
+                {
+                    if (lstNPCs.Items[i] is NpcListItem npc && npc.InstanceId == previousNpcId)
+                    {
+                        lstNPCs.SelectedIndex = i;
+                        break;
+                    }
+                }
+            }
+
+            if (lstNPCs.SelectedItem is not NpcListItem)
+                ClearNpcTarget();
 
             lstItems.BeginUpdate();
             lstItems.Items.Clear();
@@ -98,7 +122,6 @@ namespace Client.Forms
                 lstItems.Items.Add(i);
             lstItems.EndUpdate();
 
-            // Chat output (Mirage-style: room header + description + exits)
             AppendChatLine($"[{roomId}] {name}");
             if (!string.IsNullOrWhiteSpace(description))
                 AppendChatLine(description);
@@ -110,6 +133,29 @@ namespace Client.Forms
 
             AppendChatLine(string.Empty);
         }
+
+        public void ApplyPlayerData(string name, int classId, int level, long experience, long nextLevelExperience)
+        {
+            lblLevel.Text = level.ToString("00");
+            lblXP.Text = $"{experience}/{nextLevelExperience}";
+            Text = $"{name} - {((CharacterClass)classId)} - MirageMUD";
+        }
+
+        public void ApplyPlayerStats(int strength, int defense, int magi, int speed, int critHit, int blockChance)
+        {
+            lblStr.Text = strength.ToString("00");
+            lblDef.Text = defense.ToString("00");
+            lblMagi.Text = magi.ToString("00");
+            lblSpeed.Text = speed.ToString("00");
+            lblCritHit.Text = critHit.ToString("00");
+            lblBlockChance.Text = blockChance.ToString("00");
+        }
+
+        public void ApplyHp(int current, int max) => lblHP.Text = $"{current}/{max}";
+        public void ApplyMp(int current, int max) => lblMP.Text = $"{current}/{max}";
+        public void ApplyStamina(int current, int max) => lblStamina.Text = $"{current}/{max}";
+        public string? GetSelectedNpcInstanceId() => _selectedNpcInstanceId;
+
         public void AppendChatLine(string text)
         {
             if (txtChat.TextLength > 0)
@@ -118,6 +164,25 @@ namespace Client.Forms
             txtChat.AppendText(text ?? string.Empty);
             txtChat.SelectionStart = txtChat.TextLength;
             txtChat.ScrollToCaret();
+        }
+
+        private void LstNPCs_SelectedIndexChanged(object? sender, System.EventArgs e)
+        {
+            if (lstNPCs.SelectedItem is NpcListItem npc)
+            {
+                _selectedNpcInstanceId = npc.InstanceId;
+                lblTarget.Text = npc.DisplayName;
+            }
+            else
+            {
+                ClearNpcTarget();
+            }
+        }
+
+        private void ClearNpcTarget()
+        {
+            _selectedNpcInstanceId = null;
+            lblTarget.Text = string.Empty;
         }
     }
 }

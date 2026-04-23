@@ -21,7 +21,7 @@ namespace Server.Game
             if (character == null)
                 throw new InvalidOperationException("Character not found.");
 
-            var roomId = _world.HasRoom(character.RoomId) ? character.RoomId : 1;
+            var roomId = _world.HasRoom(character.RoomId) ? character.RoomId : _world.DefaultRoomId;
             var direction = Enum.IsDefined(typeof(Direction), character.Direction)
                 ? (Direction)character.Direction
                 : Direction.South;
