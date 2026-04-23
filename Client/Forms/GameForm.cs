@@ -31,6 +31,27 @@ namespace Client.Forms
 
         private async void GameForm_KeyDown(object? sender, KeyEventArgs e)
         {
+            if (e.KeyCode == Keys.ControlKey)
+            {
+                var npcInstanceId = GetSelectedNpcInstanceId();
+                if (string.IsNullOrWhiteSpace(npcInstanceId))
+                {
+                    AppendChatLine("System: Select an NPC target first.");
+                    return;
+                }
+
+                try
+                {
+                    await Client.Game.ClientGameLogic.SendAttack(_client, npcInstanceId);
+                }
+                catch
+                {
+                    // ignore for now
+                }
+
+                return;
+            }
+
             Direction? dir = e.KeyCode switch
             {
                 Keys.Up => Direction.North,
@@ -80,6 +101,7 @@ namespace Client.Forms
             int roomId,
             string name,
             string description,
+            bool showNarration,
             IReadOnlyList<string> exits,
             IReadOnlyList<string> players,
             IReadOnlyList<NpcInstanceView> npcs,
@@ -122,16 +144,19 @@ namespace Client.Forms
                 lstItems.Items.Add(i);
             lstItems.EndUpdate();
 
-            AppendChatLine($"[{roomId}] {name}");
-            if (!string.IsNullOrWhiteSpace(description))
-                AppendChatLine(description);
+            if (showNarration)
+            {
+                AppendChatLine($"[{roomId}] {name}");
+                if (!string.IsNullOrWhiteSpace(description))
+                    AppendChatLine(description);
 
-            if (exits.Count > 0)
-                AppendChatLine($"Exits: {string.Join(", ", exits)}");
-            else
-                AppendChatLine("Exits: none");
+                if (exits.Count > 0)
+                    AppendChatLine($"Exits: {string.Join(", ", exits)}");
+                else
+                    AppendChatLine("Exits: none");
 
-            AppendChatLine(string.Empty);
+                AppendChatLine(string.Empty);
+            }
         }
 
         public void ApplyPlayerData(string name, int classId, int level, long experience, long nextLevelExperience)

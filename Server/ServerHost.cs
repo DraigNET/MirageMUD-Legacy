@@ -45,7 +45,7 @@ namespace Server
             };
 
             // Loop (runs even with 0 players)
-            _loop = new ServerLoop(_world);
+            _loop = new ServerLoop(_world, _handler.ProcessSlowTick);
         }
 
         public void Start()

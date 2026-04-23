@@ -61,5 +61,18 @@ namespace Server.Networking
 
             return clientIds;
         }
+
+        public IReadOnlyList<(int ClientId, string AccountId, string CharacterId)> GetActiveCharacters()
+        {
+            var activeCharacters = new List<(int ClientId, string AccountId, string CharacterId)>();
+
+            foreach (var kv in _clients)
+            {
+                if (kv.Value.AccountId is string accountId && kv.Value.CharacterId is string characterId)
+                    activeCharacters.Add((kv.Key, accountId, characterId));
+            }
+
+            return activeCharacters;
+        }
     }
 }

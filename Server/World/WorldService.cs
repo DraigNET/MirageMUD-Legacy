@@ -10,6 +10,8 @@ namespace Server.World
         private readonly Dictionary<int, RoomDefinition> _rooms = new();
         private readonly Dictionary<string, NPC> _npcDefinitions = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, NpcInstance> _npcInstances = new(StringComparer.Ordinal);
+        private readonly List<PendingNpcRespawn> _pendingNpcRespawns = new();
+        private readonly HashSet<int> _dirtyRooms = new();
         private readonly Dictionary<int, HashSet<string>> _roomOccupants = new();
         private readonly Dictionary<int, HashSet<string>> _roomNpcs = new();
         private readonly Dictionary<string, int> _characterRooms = new();
@@ -27,6 +29,8 @@ namespace Server.World
             _rooms.Clear();
             _npcDefinitions.Clear();
             _npcInstances.Clear();
+            _pendingNpcRespawns.Clear();
+            _dirtyRooms.Clear();
             _roomOccupants.Clear();
             _roomNpcs.Clear();
             _characterRooms.Clear();
@@ -132,6 +136,40 @@ namespace Server.World
             return views;
         }
 
+        public NpcCombatResult? AttackNpc(int roomId, string instanceId, int damage)
+        {
+            if (!_roomNpcs.TryGetValue(roomId, out var roomNpcIds) || !roomNpcIds.Contains(instanceId))
+                return null;
+
+            if (!_npcInstances.TryGetValue(instanceId, out var instance))
+                return null;
+
+            if (!_npcDefinitions.TryGetValue(instance.NpcId, out var definition))
+                return null;
+
+            var displayName = GetNpcDisplayName(roomId, instanceId) ?? definition.Name;
+            instance.CurrentHP = Math.Max(0, instance.CurrentHP - Math.Max(0, damage));
+
+            var died = instance.CurrentHP <= 0;
+            if (died)
+            {
+                roomNpcIds.Remove(instanceId);
+                _npcInstances.Remove(instanceId);
+                ScheduleRespawn(roomId, definition);
+            }
+
+            return new NpcCombatResult
+            {
+                InstanceId = instanceId,
+                DisplayName = displayName,
+                BaseName = definition.Name,
+                RoomId = roomId,
+                Damage = Math.Max(0, damage),
+                RemainingHP = instance.CurrentHP,
+                Died = died
+            };
+        }
+
         public bool TryMove(string characterId, Direction direction, out RoomSnapshot snapshot)
         {
             snapshot = null!;
@@ -197,7 +235,37 @@ namespace Server.World
 
         public void FastTick() { }
         public void SlowTick() { }
-        public void SpawnTick() => SpawnMissingRoomNpcs();
+        public void SpawnTick()
+        {
+            var nowUtc = DateTime.UtcNow;
+            var readyRespawns = _pendingNpcRespawns
+                .Where(respawn => respawn.RespawnAtUtc <= nowUtc)
+                .ToList();
+
+            if (readyRespawns.Count == 0)
+                return;
+
+            foreach (var respawn in readyRespawns)
+            {
+                if (_npcDefinitions.TryGetValue(respawn.NpcId, out var definition))
+                {
+                    SpawnNpc(respawn.RoomId, definition);
+                    _dirtyRooms.Add(respawn.RoomId);
+                }
+            }
+
+            _pendingNpcRespawns.RemoveAll(respawn => respawn.RespawnAtUtc <= nowUtc);
+        }
+
+        public IReadOnlyList<int> ConsumeDirtyRooms()
+        {
+            if (_dirtyRooms.Count == 0)
+                return Array.Empty<int>();
+
+            var rooms = _dirtyRooms.OrderBy(id => id).ToList();
+            _dirtyRooms.Clear();
+            return rooms;
+        }
 
         private void AddRoom(RoomDefinition room)
         {
@@ -241,6 +309,17 @@ namespace Server.World
             _roomNpcs[roomId].Add(instanceId);
         }
 
+        private void ScheduleRespawn(int roomId, NPC definition)
+        {
+            var respawnAtUtc = DateTime.UtcNow.AddSeconds(Math.Max(1, definition.RespawnSeconds));
+            _pendingNpcRespawns.Add(new PendingNpcRespawn
+            {
+                RoomId = roomId,
+                NpcId = definition.Id,
+                RespawnAtUtc = respawnAtUtc
+            });
+        }
+
         private (string InstanceId, string BaseName)? BuildNpcEntry(string instanceId)
         {
             if (!_npcInstances.TryGetValue(instanceId, out var instance))
@@ -250,6 +329,13 @@ namespace Server.World
                 return null;
 
             return (instance.InstanceId, definition.Name);
+        }
+
+        private string? GetNpcDisplayName(int roomId, string instanceId)
+        {
+            return GetNpcsInRoom(roomId)
+                .FirstOrDefault(npc => string.Equals(npc.InstanceId, instanceId, StringComparison.Ordinal))
+                ?.DisplayName;
         }
 
         private static string ToExitDisplayName(string exitKey) => exitKey.ToUpperInvariant() switch

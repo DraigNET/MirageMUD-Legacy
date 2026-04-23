@@ -195,6 +195,29 @@ namespace Server.Networking
                     break;
                 }
 
+                case ClientPacketId.CAttack:
+                {
+                    using var ms = new MemoryStream(payload.ToArray());
+                    using var br = new BinaryReader(ms, Encoding.UTF8);
+
+                    var npcInstanceId = br.ReadString();
+
+                    if (!_tcp.TryGetCharacter(clientId, out var characterId) || characterId is null)
+                    {
+                        _tcp.SendAlert(clientId, "Not in-game.");
+                        break;
+                    }
+
+                    if (!_tcp.TryGetAccount(clientId, out var accountId) || accountId is null)
+                    {
+                        _tcp.SendAlert(clientId, "Not logged in.");
+                        break;
+                    }
+
+                    HandleAttack(clientId, accountId, characterId, npcInstanceId);
+                    break;
+                }
+
                 case ClientPacketId.CSayMsg:
                 {
                     using var ms = new MemoryStream(payload.ToArray());
@@ -269,10 +292,39 @@ namespace Server.Networking
                 BroadcastRoomMessage(roomId.Value, "Server", $"{name} has disconnected.");
         }
 
+        public void ProcessSlowTick()
+        {
+            foreach (var activeCharacter in _tcp.GetActiveCharacters())
+            {
+                if (_logic.TryRegenerateStamina(activeCharacter.AccountId, activeCharacter.CharacterId, 1, out var stamina))
+                    _tcp.SendPlayerStamina(activeCharacter.ClientId, stamina.Current, stamina.Max);
+            }
+
+            foreach (var roomId in _world.ConsumeDirtyRooms())
+                BroadcastRoomSnapshot(roomId);
+        }
+
         private void HandleMovement(int clientId, string? accountId, string characterId, Direction direction)
         {
             var fromRoomId = _world.GetCharacterRoom(characterId);
             var name = _world.GetCharacterName(characterId) ?? "Someone";
+
+            if (!string.IsNullOrWhiteSpace(accountId))
+            {
+                var character = _logic.GetCharacter(accountId, characterId);
+                if (character == null)
+                {
+                    _tcp.SendAlert(clientId, "Character not found.");
+                    return;
+                }
+
+                var stamina = _logic.GetVital(character, VitalType.Stamina);
+                if (stamina.Current <= 0)
+                {
+                    _tcp.SendAlert(clientId, "You are too exhausted to move.");
+                    return;
+                }
+            }
 
             if (!_world.TryMove(characterId, direction, out var snapshot))
             {
@@ -301,6 +353,65 @@ namespace Server.Networking
                 clientId);
         }
 
+        private void HandleAttack(int clientId, string accountId, string characterId, string npcInstanceId)
+        {
+            if (string.IsNullOrWhiteSpace(npcInstanceId))
+            {
+                _tcp.SendAlert(clientId, "Select a target first.");
+                return;
+            }
+
+            var roomId = _world.GetCharacterRoom(characterId);
+            if (!roomId.HasValue)
+            {
+                _tcp.SendAlert(clientId, "You are nowhere.");
+                return;
+            }
+
+            var character = _logic.GetCharacter(accountId, characterId);
+            if (character == null)
+            {
+                _tcp.SendAlert(clientId, "Character not found.");
+                return;
+            }
+
+            if (!_logic.TrySpendStamina(accountId, characterId, 1, out var stamina))
+            {
+                _tcp.SendAlert(clientId, "You are too exhausted to attack.");
+                _tcp.SendPlayerStamina(clientId, stamina.Current, stamina.Max);
+                return;
+            }
+
+            _tcp.SendPlayerStamina(clientId, stamina.Current, stamina.Max);
+
+            var damage = Math.Max(1, character.Strength + Random.Shared.Next(0, 3));
+            var attackResult = _world.AttackNpc(roomId.Value, npcInstanceId, damage);
+
+            if (attackResult == null)
+            {
+                _tcp.SendAlert(clientId, "That target is no longer here.");
+                return;
+            }
+
+            var playerName = _world.GetCharacterName(characterId) ?? "Someone";
+            var roomClientIds = _tcp.GetClientIdsForCharacters(_world.GetCharactersInRoom(roomId.Value));
+
+            foreach (var targetClientId in roomClientIds)
+            {
+                var message = targetClientId == clientId
+                    ? $"You hit {attackResult.DisplayName} for {attackResult.Damage} damage."
+                    : $"{playerName} hits {attackResult.DisplayName} for {attackResult.Damage} damage.";
+
+                _tcp.SendSayMsg(targetClientId, "Combat", message);
+            }
+
+            if (attackResult.Died)
+            {
+                BroadcastRoomMessage(roomId.Value, "Combat", $"{attackResult.DisplayName} dies.");
+                BroadcastRoomSnapshot(roomId.Value);
+            }
+        }
+
         private void HandlePlayerSay(string characterId, string text)
         {
             var roomId = _world.GetCharacterRoom(characterId);
@@ -325,6 +436,15 @@ namespace Server.Networking
 
                 _tcp.SendSayMsg(targetClientId, from, message);
             }
+        }
+
+        private void BroadcastRoomSnapshot(int roomId)
+        {
+            var snapshot = _world.BuildRoomSnapshot(roomId);
+            var targetClientIds = _tcp.GetClientIdsForCharacters(_world.GetCharactersInRoom(roomId));
+
+            foreach (var targetClientId in targetClientIds)
+                _tcp.SendRoomSnapshot(targetClientId, snapshot, showNarration: false);
         }
 
         private void SendPlayerState(int clientId, string accountId, string characterId)

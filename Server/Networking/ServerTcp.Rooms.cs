@@ -5,13 +5,14 @@ namespace Server.Networking
 {
     public partial class ServerTcp
     {
-        public void SendRoomSnapshot(int clientId, RoomSnapshot room)
+        public void SendRoomSnapshot(int clientId, RoomSnapshot room, bool showNarration = true)
         {
             using var w = new PacketWriter((int)ServerPacketId.SRoomData);
 
             w.Write(room.RoomId);
             w.Write(room.Name);
             w.Write(room.Description);
+            w.Write(showNarration);
 
             // Exits
             w.Write(room.Exits.Count);

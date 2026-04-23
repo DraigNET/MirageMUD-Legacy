@@ -102,6 +102,7 @@ namespace Client.Game
                         int roomId = reader.ReadInt();
                         string name = reader.ReadString();
                         string description = reader.ReadString();
+                        bool showNarration = reader.ReadBool();
 
                         int exitCount = reader.ReadInt();
                         var exits = new List<string>(exitCount);
@@ -138,6 +139,7 @@ namespace Client.Game
                                 roomId,
                                 name,
                                 description,
+                                showNarration,
                                 exits,
                                 players,
                                 npcs,

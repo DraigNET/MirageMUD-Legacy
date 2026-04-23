@@ -69,5 +69,12 @@ namespace Client.Game
                 writer.Write(text);
             });
         }
+        public static async Task SendAttack(NetworkClient client, string npcInstanceId)
+        {
+            await client.SendAsync((int)ClientPacketId.CAttack, writer =>
+            {
+                writer.Write(npcInstanceId);
+            });
+        }
     }
 }

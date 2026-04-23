@@ -6,13 +6,15 @@ namespace Server.Networking
     internal sealed class ServerLoop
     {
         private readonly WorldService _world;
+        private readonly Action _slowTickAction;
 
         private CancellationTokenSource? _cts;
         private Task? _task;
 
-        public ServerLoop(WorldService world)
+        public ServerLoop(WorldService world, Action? slowTickAction = null)
         {
             _world = world;
+            _slowTickAction = slowTickAction ?? (() => { });
         }
 
         public void Start()
@@ -41,13 +43,11 @@ namespace Server.Networking
         private async Task RunAsync(CancellationToken ct)
         {
             // Basic tick cadence:
-            // - FastTick: 250ms (movement queue later, timed events)
-            // - SlowTick: 1000ms (regen/cooldowns)
-            // - SpawnTick: 5000ms (NPC respawns later)
+            // - FastTick: 250ms (future sub-second actions)
+            // - WorldTick: 1000ms (regen, NPC timers, cooldowns, respawns)
 
             var swFast = Stopwatch.StartNew();
-            var swSlow = Stopwatch.StartNew();
-            var swSpawn = Stopwatch.StartNew();
+            var swWorld = Stopwatch.StartNew();
 
             while (!ct.IsCancellationRequested)
             {
@@ -57,16 +57,12 @@ namespace Server.Networking
                     _world.FastTick();
                 }
 
-                if (swSlow.ElapsedMilliseconds >= 1000)
+                if (swWorld.ElapsedMilliseconds >= 1000)
                 {
-                    swSlow.Restart();
+                    swWorld.Restart();
                     _world.SlowTick();
-                }
-
-                if (swSpawn.ElapsedMilliseconds >= 5000)
-                {
-                    swSpawn.Restart();
                     _world.SpawnTick();
+                    _slowTickAction();
                 }
 
                 await Task.Delay(10, ct);

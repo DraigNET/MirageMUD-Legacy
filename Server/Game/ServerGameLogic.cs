@@ -49,6 +49,57 @@ namespace Server.Game
             return true;
         }
 
+        public bool TrySpendStamina(string username, string characterId, int amount, out (int Current, int Max) stamina)
+        {
+            stamina = (0, 0);
+
+            var account = _accounts.GetByUsername(username);
+            if (account == null)
+                return false;
+
+            var character = account.Characters.FirstOrDefault(c => c.Id == characterId);
+            if (character == null)
+                return false;
+
+            var current = character.Vitals[(int)VitalType.Stamina];
+            if (current < amount)
+            {
+                stamina = GetVital(character, VitalType.Stamina);
+                return false;
+            }
+
+            character.Vitals[(int)VitalType.Stamina] -= amount;
+            _accounts.Save(account);
+            stamina = GetVital(character, VitalType.Stamina);
+            return true;
+        }
+
+        public bool TryRegenerateStamina(string username, string characterId, int amount, out (int Current, int Max) stamina)
+        {
+            stamina = (0, 0);
+
+            var account = _accounts.GetByUsername(username);
+            if (account == null)
+                return false;
+
+            var character = account.Characters.FirstOrDefault(c => c.Id == characterId);
+            if (character == null)
+                return false;
+
+            var max = GetVital(character, VitalType.Stamina).Max;
+            var current = character.Vitals[(int)VitalType.Stamina];
+            if (current >= max)
+            {
+                stamina = (current, max);
+                return false;
+            }
+
+            character.Vitals[(int)VitalType.Stamina] = Math.Min(max, current + amount);
+            _accounts.Save(account);
+            stamina = GetVital(character, VitalType.Stamina);
+            return true;
+        }
+
         public (int Current, int Max) GetVital(Character character, VitalType vital)
         {
             var max = vital switch
